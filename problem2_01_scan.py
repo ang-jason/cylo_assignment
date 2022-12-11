@@ -2,32 +2,11 @@
 import boto3
 import pprint
 import revoke_sg_rule_id_func
+from helper_func import add_to_dict as add_to_dict
+from helper_func import OUTPUT_SEC_ID_TXT_FILE
 
 SPECIAL_TAG_KEY='GROUP_RULES_ID_TAG'
 SPECIAL_TAG_VALUE='JASON'
-
-
-def add_to_dict(the_dict,item_groupId, itemgroupRuleId):
-    
-    if (item_groupId) in the_dict:
-        the_dict[item_groupId].append(itemgroupRuleId)
-    else:
-        the_dict[item_groupId]=[itemgroupRuleId]
-    
-    return the_dict
-
-
-def create_pairs_from_dict(the_dict):
-
-# Iterate over a dictionary with list values and create
-# a pair of all key-value pairs.
-    pairs = [   (key, value) 
-            for key, values in the_dict.items() 
-            for value in values ]
-    # for pair in pairs:
-        # print(pair)
-        
-    return pairs
 
 
 
@@ -45,10 +24,12 @@ for each in ec2_cli.describe_instances()['Reservations']:
     for each_in in each['Instances']:
         print(each_in['InstanceId'], each_in['State']['Name'])
         # print(each_in)
-        for each_in_in in each_in['NetworkInterfaces'][0]['Groups']:
-            # print(each_in_in)
-            print(each_in_in['GroupName'],each_in_in['GroupId'])
-            security_groupId_to_check.append(each_in_in['GroupId'])
+        if each_in['State']['Name'] == 'running':
+            print(each_in['InstanceId'])
+            for each_in_in in each_in['NetworkInterfaces'][0]['Groups']:
+                print(each_in_in)
+                print(each_in_in['GroupName'],each_in_in['GroupId'])
+                security_groupId_to_check.append(each_in_in['GroupId'])
 
 # Trigger point is attached security groups to the instances
 print("\nsecurity_groupId_to_check[]")
@@ -81,7 +62,7 @@ for each_groupId in security_groupId_to_check:
                 # repeat
                 add_to_dict(security_group_rulesId_to_check,each['GroupId'],each['SecurityGroupRuleId'])
 
-            elif each['Tags'][0]['Key'] != 'GROUP_RULES_ID_TAG' and each['Tags'][0]['Value'] != 'JASON' :
+            elif each['Tags'][0]['Key'] != SPECIAL_TAG_KEY and each['Tags'][0]['Value'] != SPECIAL_TAG_VALUE :
                 counter+= 1
                 print("DEBUG",counter,each['GroupId'],each['SecurityGroupRuleId'],each['ToPort'],each['CidrIpv4'], each['Tags'][0]['Key'],':',each['Tags'][0]['Value'] ) #CidrIpv6 
 
@@ -98,12 +79,9 @@ print(security_group_rulesId_to_check)
 
 
 
-pairs=create_pairs_from_dict(security_group_rulesId_to_check)
 
-for pair in pairs:
-    print(pair)
-    # print(pair[0],pair[1])
-    
-    #this will call the function to revoke the security group rule
-    res =revoke_sg_rule_id_func.revoke_sg_rule_id_func(pair[0],pair[1])
-    print(pair[0],pair[1], res)
+
+import json
+with open(OUTPUT_SEC_ID_TXT_FILE, 'w+') as convert_file:
+    convert_file.write(json.dumps(security_group_rulesId_to_check))
+
